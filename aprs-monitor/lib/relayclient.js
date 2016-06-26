@@ -54,8 +54,8 @@ RelayClient.prototype._connect = function() {
 };
 
 RelayClient.prototype._handleError = function(error) {
-  console.log("Socket Error:", err.toString());
-  this.emit('socket_error', err);
+  console.log("Socket Error:", error.toString());
+  this.emit('socket_error', error);
 };
 
 RelayClient.prototype._handleClose = function() {

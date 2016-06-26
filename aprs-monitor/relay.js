@@ -4,9 +4,13 @@
 
 var tls = require('tls'),
     fs = require('fs'),
-    express = require('express')
+    express = require('express'),
+    net = require('net');
 
 var io;
+var tcpClients = [];
+
+// APRS Receiver
 
 var options = {
   ca: [fs.readFileSync('easyrsa/keys/ca.crt')],
@@ -15,6 +19,8 @@ var options = {
   requestCert: true,
   rejectUnauthorized: true
 };
+
+var buff = "";
 
 tls.createServer(options, function (s) {
   var cert = s.getPeerCertificate();
@@ -25,10 +31,15 @@ tls.createServer(options, function (s) {
   console.log("Remote port: ", s.remotePort);
 
   s.on('data', function(data) {
-    var d = data.toString().split("\n").filter(function(n){ return n != "" });
-    for (var i in d) {
-      console.log(d[i]);
-      io.emit('aprs', d[i]);
+    data = data.toString();
+    console.log(data);
+    io.emit('aprs', data);
+    for (var i in tcpClients) {
+      try {
+        tcpClients[i].write(data + "\r\n");
+      } catch (e) {
+        console.log("Error sending Socket to " + tcpClients[i].name + ": ",e);
+      }
     }
   });
 
@@ -37,6 +48,8 @@ tls.createServer(options, function (s) {
   });
 
 }).listen(8000);
+
+// WebSocket Transmitter
 
 var app = express();
 var http = require('http').Server(app);
@@ -49,3 +62,12 @@ app.get('/', function(req, res){
 http.listen(3000, function(){
   console.log('listening on *:3000');
 });
+
+// Start a TCP Server
+net.createServer(function (socket) {
+  socket.name = socket.remoteAddress + ":" + socket.remotePort 
+  tcpClients.push(socket);
+  socket.on('end', function () {
+    tcpClients.splice(tcpClients.indexOf(socket), 1);
+  });
+}).listen(4000);
